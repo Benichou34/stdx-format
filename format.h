@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Benichou Software
+ * Copyright (c) 2020, Benichou Software
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,6 +23,8 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Purpose: The format class provides C++ printf-like formatting
  */
 
 #ifndef STDX_FORMAT_H_INCLUDED
@@ -42,9 +44,16 @@ namespace stdx
 		typedef Traits traits_type;
 		typedef std::basic_string<_CharT, Traits> string_type;
 
-		explicit basic_format(const string_type& strFormat = string_type())
+		enum class show_address
+		{
+			relative,
+			absolute,
+			none
+		};
+
+		basic_format(const string_type& strFormat = string_type())
 			: m_oss(m_ossP), m_strFormat(strFormat), m_ulPos(0), m_ioFlags(m_oss.flags()) {}
-		basic_format(std::basic_ostream<_CharT, Traits>& oss, const string_type& strFormat = string_type())
+		explicit basic_format(std::basic_ostream<_CharT, Traits>& oss, const string_type& strFormat = string_type())
 			: m_oss(oss), m_strFormat(strFormat), m_ulPos(0), m_ioFlags(m_oss.flags()) {}
 		~basic_format() { flush(); }
 
@@ -75,7 +84,7 @@ namespace stdx
 			return hex(strHex.data(), strHex.size() * sizeof(char_type), strDelim);
 		}
 
-		basic_format& mem(const void* pMem, size_t ulSize, size_t ulLine = 16)
+		basic_format& mem(const void* pMem, size_t ulSize, size_t ulLine = 16, show_address address = show_address::relative)
 		{
 			static const string_type spacer(3, traits_type::to_char_type(' '));
 
@@ -84,45 +93,47 @@ namespace stdx
 
 			while (ulSize)
 			{
-				m_oss << std::hex << std::setfill(traits_type::to_char_type('0')) << std::setw(sizeof(size_t) * 2) << std::uppercase << reinterpret_cast<long>(static_cast<const char*>(pMem) + ulTmpPos) << ": ";
-		//		m_oss << std::hex << std::setfill(traits_type::to_char_type('0')) << std::setw(sizeof(size_t) * 2) << std::uppercase << ulTmpPos << ": ";
+				m_oss << std::hex << std::setfill(traits_type::to_char_type('0')) << std::setw(sizeof(size_t) * 2) << std::uppercase;
+				if (address == show_address::relative)
+					m_oss << ulTmpPos << ": ";
+				else if (address == show_address::absolute)
+					m_oss << reinterpret_cast<size_t>(static_cast<const char*>(pMem) + ulTmpPos) << ": ";
 
 				size_t ulTmpSize = ulSize;
 				if (ulTmpSize > ulLine)
 					ulTmpSize = ulLine;
 
-				string_type strAscii;
-				strAscii.reserve(ulTmpSize);
-
 				for (size_t i = 0; i < ulTmpSize; i++)
-				{
-					char cTmp = static_cast<const char*>(pMem)[ulTmpPos];
-					m_oss << std::setw(2) << traits_type::to_int_type(cTmp & 0xFF) << traits_type::to_char_type(' ');
-
-					if (cTmp > 31)
-						strAscii += cTmp;
-					else
-						strAscii += '.';
-
-					ulTmpPos++;
-				}
+					m_oss << std::setw(2) << traits_type::to_int_type(static_cast<const char*>(pMem)[ulTmpPos + i] & 0xFF) << traits_type::to_char_type(' ');
 
 				for (size_t i = ulTmpSize; i < ulLine; i++)
 					m_oss << spacer;
 
-				m_oss << strAscii << std::endl;
+				for (size_t i = 0; i < ulTmpSize; i++)
+				{
+					char cTmp = static_cast<const char*>(pMem)[ulTmpPos + i];
+
+					if (cTmp > 31)
+						m_oss << cTmp;
+					else
+						m_oss << '.';
+				}
+
+				m_oss << std::endl;
+				ulTmpPos += ulTmpSize;
 				ulSize -= ulTmpSize;
 			}
 
 			return *this;
 		}
 
-		basic_format& mem(const string_type& strMem, size_t ulLine = 16)
+		basic_format& mem(const string_type& strMem, size_t ulLine = 16, show_address address = show_address::relative)
 		{
-			return mem(strMem.data(), strMem.size() * sizeof(char_type), ulLine);
+			return mem(strMem.data(), strMem.size() * sizeof(char_type), ulLine, address);
 		}
 
-		template <typename InputIterator> basic_format& array(InputIterator first, InputIterator last,
+		template <typename InputIterator>
+		basic_format& array(InputIterator first, InputIterator last,
 			const string_type& strDelim = string_type(1, traits_type::to_char_type(' ')))
 		{
 			parseNextFlag();
@@ -172,7 +183,6 @@ namespace stdx
 
 			return *this;
 		}
-
 
 		basic_format(basic_format&) = delete;
 		basic_format& operator=(basic_format&) = delete;
@@ -235,7 +245,7 @@ namespace stdx
 				++m_ulPos;
 				break;
 			case '0':
-				m_oss << std::setfill(traits_type::to_char_type('0'));
+				m_oss << std::internal << std::setfill(traits_type::to_char_type('0'));
 				++m_ulPos;
 				break;
 			case '#':
@@ -298,6 +308,7 @@ namespace stdx
 			case 'P':
 			case 'X':
 				m_oss << std::uppercase;
+				[[fallthrough]]; // no break
 			case 'p': // pointer => set hex.
 			case 'x':
 				m_oss << std::hex << std::internal;
@@ -309,13 +320,14 @@ namespace stdx
 
 			case 'E':
 				m_oss << std::uppercase;
+				[[fallthrough]]; // no break
 			case 'e':
-				m_oss << std::scientific;
-				m_oss << std::dec;
+				m_oss << std::scientific << std::dec;
 				break;
 
 			case 'f':
 				m_oss << std::fixed;
+				[[fallthrough]]; // no break
 			case 'u':
 			case 'd':
 			case 'i':
@@ -324,6 +336,7 @@ namespace stdx
 
 			case 'G':
 				m_oss << std::uppercase;
+				[[fallthrough]]; // no break
 			case 'g': // 'g' conversion is default for floats.
 				m_oss << std::dec;
 				break;
@@ -339,12 +352,14 @@ namespace stdx
 
 			case 'B': // Boolean
 				m_oss << std::uppercase;
+				[[fallthrough]]; // no break
 			case 'b':
 				m_oss << std::boolalpha;
 				break;
 
 			case 'Z': // Object
 				m_oss << std::uppercase;
+				[[fallthrough]]; // no break
 			case 'z':
 				break;
 
@@ -375,4 +390,3 @@ namespace stdx
 	typedef basic_format<wchar_t> wformat;
 }
 #endif // STDX_FORMAT_H_INCLUDED
-
