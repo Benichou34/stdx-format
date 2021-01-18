@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Benichou Software
+ * Copyright (c) 2021, B. Leforestier
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -78,10 +78,11 @@ namespace stdx
 			return *this;
 		}
 
-		basic_format& hex(const string_type& strHex,
+		template <class T, typename = std::enable_if_t<std::is_class_v<T>>>
+		basic_format& hex(const T& strHex,
 			const string_type& strDelim = string_type(1, traits_type::to_char_type(' ')))
 		{
-			return hex(strHex.data(), strHex.size() * sizeof(char_type), strDelim);
+			return hex(strHex.data(), strHex.size() * sizeof(T::value_type), strDelim);
 		}
 
 		basic_format& mem(const void* pMem, size_t ulSize, size_t ulLine = 16, show_address address = show_address::relative)
@@ -127,9 +128,10 @@ namespace stdx
 			return *this;
 		}
 
-		basic_format& mem(const string_type& strMem, size_t ulLine = 16, show_address address = show_address::relative)
+		template <class T, typename = std::enable_if_t<std::is_class_v<T>>>
+		basic_format& mem(const T& strMem, size_t ulLine = 16, show_address address = show_address::relative)
 		{
-			return mem(strMem.data(), strMem.size() * sizeof(char_type), ulLine, address);
+			return mem(strMem.data(), strMem.size() * sizeof(T::value_type), ulLine, address);
 		}
 
 		template <typename InputIterator>
@@ -262,7 +264,7 @@ namespace stdx
 
 			// Parse Width
 			size_t ulPosWidth = m_strFormat.find_first_not_of(szNumeric, m_ulPos);
-			if (ulPosWidth != string_type::npos)
+			if (ulPosWidth != string_type::npos && ulPosWidth != m_ulPos)
 			{
 				int iWidth = -1;
 
