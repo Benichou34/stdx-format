@@ -101,7 +101,7 @@ namespace stdx
 					m_oss << reinterpret_cast<size_t>(static_cast<const char*>(pMem) + ulTmpPos) << ": ";
 
 				size_t ulTmpSize = ulSize;
-				if (ulTmpSize > ulLine)
+				if (ulLine > 0 && ulTmpSize > ulLine)
 					ulTmpSize = ulLine;
 
 				for (size_t i = 0; i < ulTmpSize; i++)
@@ -120,9 +120,11 @@ namespace stdx
 						m_oss << '.';
 				}
 
-				m_oss << std::endl;
 				ulTmpPos += ulTmpSize;
 				ulSize -= ulTmpSize;
+
+				if (ulSize > 0)
+					m_oss << std::endl;
 			}
 
 			return *this;
@@ -164,6 +166,18 @@ namespace stdx
 				m_oss << it->first << strSeparator << it->second;
 			}
 
+			return *this;
+		}
+
+		basic_format& ends()
+		{
+			m_oss << std::ends;
+			return *this;
+		}
+
+		basic_format& endl()
+		{
+			m_oss << std::endl;
 			return *this;
 		}
 
