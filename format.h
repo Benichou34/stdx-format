@@ -72,7 +72,7 @@ namespace stdx
 			{
 				if (i > 0)
 					m_oss << strDelim;
-				m_oss << std::setw(2) << traits_type::to_int_type(static_cast<const char*>(pHex)[i] & 0xFF);
+				m_oss << std::setw(2) << traits_type::to_int_type(static_cast<const char*>(pHex)[i] & static_cast<char>(0xFF));
 			}
 
 			return *this;
@@ -105,7 +105,7 @@ namespace stdx
 					ulTmpSize = ulLine;
 
 				for (size_t i = 0; i < ulTmpSize; i++)
-					m_oss << std::setw(2) << traits_type::to_int_type(static_cast<const char*>(pMem)[ulTmpPos + i] & 0xFF) << traits_type::to_char_type(' ');
+					m_oss << std::setw(2) << traits_type::to_int_type(static_cast<const char*>(pMem)[ulTmpPos + i] & static_cast<char>(0xFF)) << traits_type::to_char_type(' ');
 
 				for (size_t i = ulTmpSize; i < ulLine; i++)
 					m_oss << spacer;
